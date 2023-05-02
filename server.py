@@ -26,10 +26,12 @@ while True:
     data = conn.recv(1024)
     if not data:
         break
-    num1, num2 = data.split(b",")
+    num1Str, num2Str = data.split(b",")
+    num1 = float(num1Str.decode())
+    num2 = float(num2Str.decode())
     print(num1)
     print(num2)
-    result = int(num1) + int(num2)
+    result = num1 + num2
     conn.send(str(result).encode())
 
 # Clean up

@@ -11,7 +11,10 @@ client_socket.connect((host, port))
 print("Connected to server")
 
 # send two numbers to the server
-client_socket.sendall("10,20".encode())
+num1 = input("Tell me the number 1: ")
+num2 = input("Tell me the number 2: ")
+strSend = "{0},{1}".format(num1, num2)
+client_socket.sendall(strSend.encode())
 
 # receive the sum from the server
 result = client_socket.recv(1024).decode()
