@@ -1,5 +1,19 @@
 import network
 import socket
+import random
+import time
+
+def generateTemperature():
+    minTemp = 20
+    maxTemp = 40
+    diff = maxTemp - minTemp
+    temperatures = []
+    
+    for i in range(0, 8):
+        temperature = minTemp + random.random() * diff
+        temperatures.append(temperature)
+
+    return temperatures
 
 # Set up the WiFi connection
 sta_if = network.WLAN(network.STA_IF)
@@ -20,19 +34,15 @@ print('IP address:', sta_if.ifconfig()[0])
 print("Waiting for a client to connect...")
 conn, addr = s.accept()
 print("Connected by", addr)
+time.sleep(3)
 
-# Receive data from the client and send a response
-while True:
-    data = conn.recv(1024)
-    if not data:
-        break
-    num1Str, num2Str = data.split(b",")
-    num1 = float(num1Str.decode())
-    num2 = float(num2Str.decode())
-    print(num1)
-    print(num2)
-    result = num1 + num2
-    conn.send(str(result).encode())
+# Generate and send temperatures to the client
+while True: 
+    temperatures = generateTemperature()
+    print(temperatures)
+    temperature_string = ",".join(str(temp) for temp in temperatures)
+    conn.sendall(temperature_string.encode())
+    time.sleep(0.5)
 
 # Clean up
 conn.close()

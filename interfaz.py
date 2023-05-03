@@ -1,11 +1,11 @@
 from tkinter import *
+from statistics import mean
 import tkinter as tk
 from ttkthemes import ThemedTk
 from tkinter import ttk
 import threading
 import time
 import subprocess
-import random
 import socket
 
 def stop_process(process, boton, label):
@@ -42,18 +42,22 @@ def upload_code():
     thread = threading.Thread(target=wait_upload_code)
     thread.start()
 
+def obtainTemperature():
+    try:
+        # receive and print temperatures indefinitely
+        while True:
+            # unpack the temperature data using struct
+            temperature_string = client_socket.recv(1024).decode()
+            temperatures = [float(temp) for temp in temperature_string.split(",")]
 
-def generateTemperature():
-    minTemp = 20
-    maxTemp = 40
-    diff = maxTemp - minTemp
-    temperatures = []
-    
-    for i in range(0, 8):
-        temperature = minTemp + random.random() * diff
-        temperatures.append(temperature)
+            # print the temperatures
+            print("Received temperatures:", temperatures)
+            return temperatures
 
-    return temperatures
+    except KeyboardInterrupt:
+        # close the connection and exit the program when Ctrl+C is pressed
+        client_socket.close()
+        print("\nProgram terminated by user.")
 
 def update_temperature(temperatures):
 
@@ -64,6 +68,9 @@ def update_temperature(temperatures):
     width = 50
     dif_x = 90
     i = 0
+
+    temp_average = mean(temperatures)
+    print(temp_average)
 
     for temp in temperatures:
         x1 = initial_x + dif_x * i
@@ -88,31 +95,30 @@ def update_temperature(temperatures):
         i += 1
     
     # Schedule the next temperature update in 1 second
-    root.after(500, func = lambda: update_temperature(generateTemperature()))
+    root.after(500, func = lambda: update_temperature(obtainTemperature()))
 
-def create_client():
-    host = '192.168.1.9'
-    port = 8000
 
-    # create socket object
-    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    # connect to the server
+#Creando socket del cliente 
+host = '192.168.1.9'
+port = 8000
+
+# create socket object
+client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+# connect to the server
+# connect to the server
+try:
     client_socket.connect((host, port))
-    print("Connected to server")
 
-    # send two numbers to the server
-    client_socket.sendall("10,20".encode())
-
-    # receive the sum from the server
-    result = client_socket.recv(1024).decode()
-    print("The sum is: ", result)
+except socket.error:
+    print("Connection failed.")
+    exit(0)
 
 #ranges 
 #20 - 25 : blue
 #26 - 33 : orange
 #34 - 40 : red
-create_client()
 colors = ["blue", "orange", "red"]
 textSensores = ["Sensor 1", "Sensor 2","Sensor 3", "Sensor 4", "Sensor 5", "Sensor 6", "Sensor 7", "Sensor 8"]
 root = ThemedTk(theme="blue")
@@ -208,5 +214,5 @@ rb_flame_on.place(x=800, y=110)
 
 myCanvas = tk.Canvas(root, bg="white", height=300, width=750)
 myCanvas.pack(side = LEFT)
-update_temperature(generateTemperature())
+update_temperature(obtainTemperature())
 root.mainloop()
