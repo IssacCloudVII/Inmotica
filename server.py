@@ -1,3 +1,4 @@
+from machine import Pin
 import network
 import socket
 import random
@@ -42,7 +43,7 @@ while True:
     print(temperatures)
     temperature_string = ",".join(str(temp) for temp in temperatures)
     conn.sendall(temperature_string.encode())
-    time.sleep(0.5)
+    time.sleep(2)
 
 # Clean up
 conn.close()

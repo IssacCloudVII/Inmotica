@@ -2,64 +2,93 @@ from tkinter import *
 from statistics import mean
 import tkinter as tk
 from ttkthemes import ThemedTk
+from tkinter import messagebox
 from tkinter import ttk
 import threading
 import time
 import subprocess
 import socket
 
-def stop_process(process, boton, label):
-    process.kill()
-    boton["state"] = tk.NORMAL
-    label.config(text = "Presiona el botón para subir o actualizar el código al ESP32." )
+IPSERVER  = "192.168.1.9"
+PORTSERVER = 8000
 
-def actualizarCodigo(controladores):
-    
-    archivoCodigo = open("./code.py", "w")
-    
-    if controladores[0].get() == 0:
-        tiempo = 0.5
+def get_user_temperature():
+    global desired_temperature
+    global accepted_temperature
+    desired_temperature = desiredtemperature_entry.get().strip()
+    if not desired_temperature:
+       messagebox.showerror("Error", "No introdujiste ninguna temperatura.")
+       return
     else:
-        tiempo = 2
+        number_temperature = int(desired_temperature)
+        if number_temperature > 40:
+            messagebox.showerror("Error", "Esa temperatura está fuera de los límites permitidos.")
+            return
+    messagebox.showinfo("Temperatura aceptada", "La temperatura fue aceptada. Inicia el proceso cuando desees.")
+    accepted_temperature = True
 
-    codigo = f"from machine import Pin\nimport time\nrelay_pin_2 = Pin(2, Pin.OUT)\nwhile True:\n\trelay_pin_2.value(1)\n\ttime.sleep({tiempo})\n\trelay_pin_2.value(0)\n\ttime.sleep({tiempo})"
+def start_program():
+    if not accepted_temperature:
+        messagebox.showerror("Error", "La temperatura aún no ha sido introducida o validada.")
+        return
+    
+    labelCodigo.config(text = "Proceso iniciado. Iniciando conexión con el servidor.")
+    root.after(3000, func = lambda: create_client_socket(IPSERVER, PORTSERVER))
 
-    archivoCodigo.write(codigo)
+def create_client_socket(IP, port):
 
-def upload_code():
-    command = "ampy --port COM4 run code.py"
-    botonSubirCodigo["state"] = tk.DISABLED
-    botonDetenerCodigo["state"] = tk.DISABLED
+    # create socket object
+    global client_socket
+    global labelCodigo
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    procesoCodigo = subprocess.Popen(command)
-    botonDetenerCodigo.configure(command=lambda: stop_process(procesoCodigo, botonSubirCodigo, labelCodigo))
-
-    def wait_upload_code():
-        time.sleep(16)
-        labelCodigo.config(text="Código subido correctamente. En cuanto quieras actualizar o detener el código, pulsa el botón.")
-        botonDetenerCodigo["state"] = tk.NORMAL
-
-    thread = threading.Thread(target=wait_upload_code)
-    thread.start()
-
-def obtainTemperature():
+    # connect to the server
     try:
-        # receive and print temperatures indefinitely
-        while True:
-            # unpack the temperature data using struct
-            temperature_string = client_socket.recv(1024).decode()
-            temperatures = [float(temp) for temp in temperature_string.split(",")]
+        client_socket.connect((IP, port))
+        labelCodigo.config(text = "Conexión establecida. Los sensores empezarán a funcionar y el programa se regulará automáticamente.")
+        global continuar_ciclo
+        continuar_ciclo = True
+        root.after(3000, program_cycle)
+    except socket.error:
+        messagebox.showerror("Error", "No se pudo establecer la conexión con el servidor.")
+        labelCodigo.config(text = "Introduce la temperatura deseada.\n Después pulsa el botón para iniciar el proceso.")
 
-            # print the temperatures
-            print("Received temperatures:", temperatures)
-            return temperatures
+
+
+def program_cycle():
+
+    global client_socket
+    global continuar_ciclo
+
+    def update_temperature():
+        global sensor_temperatures
+        obtain_temperature(client_socket)
+        # show the temperatures inside the thread
+        show_temperature(sensor_temperatures)
+        print("Mis temperaturas: " + str(sensor_temperatures))
+    
+    print("Empezando hilo")
+    thread = threading.Thread(target=update_temperature)
+    thread.start()
+    if continuar_ciclo:
+        root.after(1, program_cycle)
+
+def obtain_temperature(socket):
+    print("Obtiendo temperaturas del servidor: ")
+    try:
+        # unpack the temperature data using struct
+        temperature_string = socket.recv(1024).decode()
+        temperatures = [float(temp) for temp in temperature_string.split(",")]
+        # print the temperatures
+        global sensor_temperatures
+        sensor_temperatures = temperatures
 
     except KeyboardInterrupt:
         # close the connection and exit the program when Ctrl+C is pressed
-        client_socket.close()
+        socket.close()
         print("\nProgram terminated by user.")
 
-def update_temperature(temperatures):
+def show_temperature(temperatures):
 
     # Delete any existing temperature bar in the canvas
     myCanvas.delete("all")
@@ -70,7 +99,6 @@ def update_temperature(temperatures):
     i = 0
 
     temp_average = mean(temperatures)
-    print(temp_average)
 
     for temp in temperatures:
         x1 = initial_x + dif_x * i
@@ -94,98 +122,85 @@ def update_temperature(temperatures):
         myCanvas.create_text(x1 + 25, 100, text = texto)
         i += 1
     
-    # Schedule the next temperature update in 1 second
-    root.after(500, func = lambda: update_temperature(obtainTemperature()))
 
 
+def stop_process(process, boton, label):
+    process.kill()
+    boton["state"] = tk.NORMAL
+    label.config(text = "Presiona el botón para subir o actualizar el código al ESP32." )
 
-#Creando socket del cliente 
-host = '192.168.1.9'
-port = 8000
+def update_code(temp, threshold, client_socket):
 
-# create socket object
-client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    def upload_code():
+        command = "ampy --port COM4 run code.py"
+        #botonSubirCodigo["state"] = tk.DISABLED
+        #botonDetenerCodigo["state"] = tk.DISABLED
 
-# connect to the server
-# connect to the server
-try:
-    client_socket.connect((host, port))
+        procesoCodigo = subprocess.Popen(command)
+        #botonDetenerCodigo.configure(command=lambda: stop_process(procesoCodigo, botonSubirCodigo, labelCodigo))
 
-except socket.error:
-    print("Connection failed.")
-    exit(0)
+        def wait_upload_code():
+            time.sleep(10)
+            labelCodigo.config(text="Código subido correctamente.")
+            #botonDetenerCodigo["state"] = tk.NORMAL
+
+        thread = threading.Thread(target=wait_upload_code)
+        thread.start()
+    
+    archivoCodigo = open("./server.py", "w")
+    
+    if temp > threshold:
+        tiempo = 0.5
+    elif temp < threshold:
+        tiempo = 2
+    else:
+        return
+
+
+    codigo = f"from machine import Pin\nimport time\nrelay_pin_2 = Pin(2, Pin.OUT)\nwhile True:\n\trelay_pin_2.value(1)\n\ttime.sleep({tiempo})\n\trelay_pin_2.value(0)\n\ttime.sleep({tiempo})"
+
+    archivoCodigo.write(codigo)
+
+    upload_code()
+    time.sleep(15)
+    update_code(obtain_temperature(client_socket), 30, client_socket)
+
+
 
 #ranges 
 #20 - 25 : blue
 #26 - 33 : orange
 #34 - 40 : red
+
 colors = ["blue", "orange", "red"]
 textSensores = ["Sensor 1", "Sensor 2","Sensor 3", "Sensor 4", "Sensor 5", "Sensor 6", "Sensor 7", "Sensor 8"]
+
 root = ThemedTk(theme="blue")
 style = ttk.Style(root)
 root.geometry("960x740")
 stop_event = threading.Event()
 root.title("Interfaz Gráfica del aire acondicionado")
-labelCodigo = tk.Label(root, text="Presiona el botón para subir o actualizar el código al ESP32.")
+labelCodigo = tk.Label(root, text="Introduce la temperatura deseada.\n Después pulsa el botón para iniciar el proceso.")
 labelCodigo.pack(pady=10)
 
-botonSubirCodigo = ttk.Button(root, text="Subir código", command=upload_code)
-botonSubirCodigo.pack(pady = 10)
-botonDetenerCodigo = ttk.Button(root, text="Detener ejecución", state="disabled")
-botonDetenerCodigo.pack(pady=10)
-botonActualizarCodigo = ttk.Button(root, text="Actualizar código", command = lambda: actualizarCodigo(controladores))
-botonActualizarCodigo.pack(pady = 10)
+botonEmpezarProceso = ttk.Button(root, text="Comenzar proceso", command=start_program)
+botonEmpezarProceso.pack(pady = 10)
+# botonDetenerCodigo = ttk.Button(root, text="Detener ejecución", state="disabled")
+# botonDetenerCodigo.pack(pady=10)
+# botonActualizarCodigo = ttk.Button(root, text="Actualizar código", command = lambda: actualizarCodigo(controladores))
+# botonActualizarCodigo.pack(pady = 10)
 
-ventiladorFrio1 = IntVar()
-ventiladorFrio2 = IntVar()
-ventiladorCaliente1 = IntVar()
-ventiladorCaliente2 = IntVar()
-bombaFrioM = IntVar()
-bombaCalienteM = IntVar()
-bombaFrioHVAC = IntVar()
-bombaCalienteHVAC = IntVar()
 peltier1 = IntVar()
 peltier2 = IntVar()
-ventiladorEmergencia = IntVar()
-ventiladorInyeccion = IntVar()
 
-controladores = [ventiladorFrio1, ventiladorFrio2, ventiladorCaliente1, ventiladorCaliente2, bombaFrioM, bombaCalienteM, bombaFrioHVAC, bombaCalienteHVAC, peltier1, peltier2, ventiladorEmergencia, ventiladorInyeccion]
+controladores = [peltier1, peltier2] 
 
-checkVentiladorFrio1 = Checkbutton(text="Ventilador Frio 1", variable=ventiladorFrio1, onvalue=1, offvalue=0)
-checkVentiladorFrio1.place(x=10, y=10)
-
-checkVentiladorFrio2 = Checkbutton(text="Ventilador Frio 2", variable=ventiladorFrio2, onvalue=1, offvalue=0)
-checkVentiladorFrio2.place(x=10, y=35)
-
-checkVentiladorCaliente1 = Checkbutton(text="Ventilador Caliente 1", variable=ventiladorCaliente1, onvalue=1, offvalue=0)
-checkVentiladorCaliente1.place(x=10, y=60)
-
-checkVentiladorCaliente2 = Checkbutton(text="Ventilador Caliente 2", variable=ventiladorCaliente2, onvalue=1, offvalue=0)
-checkVentiladorCaliente2.place(x=10, y=85)
-
-checkBombaFrioM = Checkbutton(text="Bomba Frio M", variable=bombaFrioM, onvalue=1, offvalue=0)
-checkBombaFrioM.place(x=10, y=110)
-
-checkBombaCalienteM = Checkbutton(text="Bomba Caliente M", variable=bombaCalienteM, onvalue=1, offvalue=0)
-checkBombaCalienteM.place(x=10, y=135)
-
-checkBombaFrioHVAC = Checkbutton(text="Bomba Frio HVAC", variable=bombaFrioHVAC, onvalue=1, offvalue=0)
-checkBombaFrioHVAC.place(x=10, y=160)
-
-checkBombaCalienteHVAC = Checkbutton(text="Bomba Caliente HVAC", variable=bombaCalienteHVAC, onvalue=1, offvalue=0)
-checkBombaCalienteHVAC.place(x=10, y=185)
 
 checkPeltier1 = Checkbutton(text="Peltier 1", variable=peltier1, onvalue=1, offvalue=0)
 checkPeltier1.place(x=10, y=210)
 
 checkPeltier2 = Checkbutton(text="Peltier 2", variable=peltier2, onvalue=1, offvalue=0)
 checkPeltier2.place(x=10, y=235)
-
-checkVentiladorEmergencia = Checkbutton(text="Ventilador Emergencia", variable=ventiladorEmergencia, onvalue=1, offvalue=0)
-checkVentiladorEmergencia.place(x=10, y=260)
-
-checkVentiladorInyeccion = Checkbutton(text="Ventilador Inyeccion", variable=ventiladorInyeccion, onvalue=1, offvalue=0)
-checkVentiladorInyeccion.place(x=10, y=285)
 
 gas_detection_label = Label(root, text="Detección de gas: ")
 gas_detection_label.place(x=800, y=10)
@@ -211,8 +226,19 @@ rb_flame_off.place(x=800, y=90)
 rb_flame_on = Radiobutton(root, text="Detectado", variable=flame_detection, value=1, state="disabled")
 rb_flame_on.place(x=800, y=110)
 
+desired_temperature = 0
+accepted_temperature = False
+client_socket = 0
+sensor_temperatures = []
+continuar_ciclo = False
+
+desiredtemperature_label = tk.Label(root, text="Temperatura deseada: (°C)")
+desiredtemperature_label.place(x = 650, y = 200)
+desiredtemperature_entry = tk.Entry(root, width = 5)
+desiredtemperature_entry.place(x = 800, y = 200)
+botonSubirTemperatura = ttk.Button(root, text="OK", width = 2.5, command = get_user_temperature)
+botonSubirTemperatura.place(x = 840, y = 200)
 
 myCanvas = tk.Canvas(root, bg="white", height=300, width=750)
 myCanvas.pack(side = LEFT)
-update_temperature(obtainTemperature())
 root.mainloop()
