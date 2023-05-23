@@ -1,7 +1,8 @@
-
 from machine import Pin, PWM, ADC
+import network
+import socket
+import random
 import time
-import dht
 
 def changeColor(red, green, blue):
     red_pwm.duty(red)
@@ -15,19 +16,40 @@ def read_temperature(pins):
         temperatures.append(temp)
     return temperatures
 
+# Set up the WiFi connection
+sta_if = network.WLAN(network.STA_IF)
+sta_if.active(True)
+sta_if.connect("SpongeBob Extreme", "7734bbd7d3fea0dc77f77600e9")
+
+# Wait until the connection is established
+while not sta_if.isconnected():
+    pass
+
+# Set up the socket server
+s = socket.socket()
+s.bind(('', 8000))
+s.listen(1)
+
+# Wait for a client to connect
+print('IP address:', sta_if.ifconfig()[0])
+print("Waiting for a client to connect...")
+conn, addr = s.accept()
+print("Connected by", addr)
+time.sleep(3)
+
 # Pines de termopar
 termoparActive = Pin(18, Pin.OUT)
 bombaPin1 = Pin(15, Pin.OUT)  # Bomba caliente
-bombaPin2 = Pin(2, Pin.OUT)  # Bomba fría
+bombaPin2 = Pin(2, Pin.OUT)  # Bomba frï¿½a
 placaPeltierPin1 = Pin(4, Pin.OUT)  # Peltier caliente
-placaPeltierPin2 = Pin(16, Pin.OUT)  # Peltier fría
+placaPeltierPin2 = Pin(16, Pin.OUT)  # Peltier frï¿½a
 ventiladorPin = Pin(5, Pin.OUT)
 
-# Pines de detección
+# Pines de detecciï¿½n
 buzzerPin = Pin(3, Pin.OUT)  # Detector de llama
-flamePin = ADC(Pin(12))  # Pin ADC para detección de llama
-smokeLED = Pin(21, Pin.OUT)  # LED de detección de humo
-smokePin = ADC(Pin(13))  # Pin ADC para detección de humo
+flamePin = ADC(Pin(12))  # Pin ADC para detecciï¿½n de llama
+smokeLED = Pin(21, Pin.OUT)  # LED de detecciï¿½n de humo
+smokePin = ADC(Pin(13))  # Pin ADC para detecciï¿½n de humo
 
 # Pines para el LED RGB
 red_pin = Pin(1, Pin.OUT)
@@ -97,14 +119,14 @@ while True:
     hum = sensor.humidity()
     temp_f = temp * (9/5) + 32.0
 
-	ventiladorPin.on()
+	ventiladorPin.off()
 
-	placaPeltierPin1.on()
+	placaPeltierPin1.off()
 
-	placaPeltierPin2.on()
+	placaPeltierPin2.off()
 
 	bombaPin1.off()
 
 	bombaPin2.off()
 
-	changeColor(255, 255, 255)
+	changeColor(0, 0, 0)

@@ -19,10 +19,12 @@ def create_client(IP, port):
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     global status_text
+    global connected
     # connect to the server
     try:
         client_socket.connect((IP, port))
         status_text.config(text = "Conexión establecida. Los sensores empezarán a funcionar y el programa se regulará automáticamente.")
+        connected = True
     except socket.error:
         messagebox.showerror("Error", "No se pudo establecer la conexión con el servidor.")
 
@@ -171,6 +173,7 @@ while True:
             file.write("\n\tchangeColor(0, 0, 0)\n")
 
 def emergencyStop(checkboxes):
+    status_text.config(text = "Paro de Emergencia Activado. Deteniendo todos los componentes.")
     stop_execution()
     for check in checkboxes:
         check.set(0)
@@ -215,7 +218,8 @@ textSensores = ["Sensor 1", "Sensor 2","Sensor 3", "Sensor 4", "Sensor 5", "Sens
 colors = ["blue", "orange", "red"]
 
 # Create the main window
-root = tk.Tk()
+root = ThemedTk(theme="blue")
+style = ttk.Style(root)
 root.geometry("960x640")  # Set the window size to 960x740 pixels
 
 # Create a frame to hold the checkboxes
@@ -251,10 +255,10 @@ button_frame = tk.Frame(root)
 button_frame.pack()
 
 # Create the buttons
-btn_upload = tk.Button(button_frame, text="Subir código", command=upload_code)
-btn_stop = tk.Button(button_frame, text="Detener Ejecución", command=stop_execution)
-btn_update = tk.Button(button_frame, text="Actualizar Código", command = lambda:update_code(checkBoxList))
-btn_emergency = tk.Button(button_frame, text="Paro de emergencia", command = lambda:emergencyStop(checkBoxList))
+btn_upload = ttk.Button(button_frame, text="Subir código", command=upload_code)
+btn_stop = ttk.Button(button_frame, text="Detener Ejecución", command=stop_execution)
+btn_update = ttk.Button(button_frame, text="Actualizar Código", command = lambda:update_code(checkBoxList))
+btn_emergency = ttk.Button(button_frame, text="Paro de emergencia", command = lambda:emergencyStop(checkBoxList))
 
 # Pack the buttons in the frame with spacing
 btn_upload.pack(pady=5)
@@ -266,13 +270,14 @@ btn_emergency.pack(pady = 5)
 canvas = tk.Canvas(root, width=750, height=350, bg="white")
 canvas.pack(pady=20)
 
-average_text = tk.Label(root, text="Average Temperature: ")
+average_text = tk.Label(root, text = "Temperatura Promedio: ")
 average_text.pack()
 
-status_text = tk.Label(root, text = "Estado Actual: Sin actividad. Sube el código para empezar")
+status_text = tk.Label(root, text = "Estado Actual: Sin actividad. Sube el código para empezar", font = ("Roboto", 11))
 status_text.place(x = 50, y = 50)
 
 client_socket = None
+connected = False
 
 # Start the main event loop
 root.mainloop()
