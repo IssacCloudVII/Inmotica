@@ -8,9 +8,11 @@ import threading
 import time
 import serial
 import subprocess
+import random
 import socket
+import numpy
 
-IPSERVER  = "192.168.1.10"
+IPSERVER  = "192.168.1.16"
 PORTSERVER = 8000
 
 def create_client(IP, port):
@@ -28,9 +30,18 @@ def create_client(IP, port):
     except socket.error:
         messagebox.showerror("Error", "No se pudo establecer la conexión con el servidor.")
 
-def upload_code():
+def startUploadthread():
     # Logic to upload the code
     print("Uploading code...")
+    upload_command = "ampy --port COM4 run auxiliar.py"
+    result = subprocess.run(upload_command, shell=True)
+
+def uploadAndConnect():
+    upload_thread = threading.Thread(target = startUploadthread)
+    upload_thread.start()
+    print("Esperando")
+    time.sleep(10)
+    print("Conectado")
     create_client(IPSERVER, PORTSERVER)
 
 def stop_execution():
@@ -212,7 +223,7 @@ def show_temperature(temperatures):
         i += 1
     
     average = sum(temperatures) / len(temperatures)
-    average_text.config(text=f"Average Temperature: {average:.2f} °C")
+    average_text.config(text=f"Temperatura Promedio: {average:.2f} °C")
 
 textSensores = ["Sensor 1", "Sensor 2","Sensor 3", "Sensor 4", "Sensor 5", "Sensor 6", "Sensor 7", "Sensor 8"]
 colors = ["blue", "orange", "red"]
@@ -255,7 +266,7 @@ button_frame = tk.Frame(root)
 button_frame.pack()
 
 # Create the buttons
-btn_upload = ttk.Button(button_frame, text="Subir código", command=upload_code)
+btn_upload = ttk.Button(button_frame, text="Subir código", command=uploadAndConnect)
 btn_stop = ttk.Button(button_frame, text="Detener Ejecución", command=stop_execution)
 btn_update = ttk.Button(button_frame, text="Actualizar Código", command = lambda:update_code(checkBoxList))
 btn_emergency = ttk.Button(button_frame, text="Paro de emergencia", command = lambda:emergencyStop(checkBoxList))
@@ -278,6 +289,8 @@ status_text.place(x = 50, y = 50)
 
 client_socket = None
 connected = False
+
+show_temperature(numpy.random.random(8) * 10 + 20)
 
 # Start the main event loop
 root.mainloop()

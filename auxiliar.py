@@ -9,12 +9,28 @@ def changeColor(red, green, blue):
     green_pwm.duty(green)
     blue_pwm.duty(blue)
 
+def generateTemperature():
+    minTemp = 20
+    maxTemp = 40
+    diff = maxTemp - minTemp
+    temperatures = []
+    
+    for i in range(0, 8):
+        temperature = minTemp + random.random() * diff
+        temperatures.append(temperature)
+
+    return temperatures
+
 def read_temperature(pins):
+
+    return generateTemperature()
+
     temperatures = []
     for pin in pins:
         temp = pin.read()
         temperatures.append(temp)
     return temperatures
+
 
 # Set up the WiFi connection
 sta_if = network.WLAN(network.STA_IF)
@@ -98,6 +114,12 @@ while True:
     termoparActive.on()
     temperatures = read_temperature(termopar_pins)
     temperatureAverage = sum(temperatures) / len(temperatures)
+
+    temperature_string = ",".join(str(temp) for temp in temperatures)
+    conn.sendall(temperature_string.encode())
+
+    continue
+
     # read the analog voltage from the ADC pin
     flameVoltage = flamePin.read() / 1023 * 2.727
     if flameVoltage < 1.8:
@@ -119,14 +141,14 @@ while True:
     hum = sensor.humidity()
     temp_f = temp * (9/5) + 32.0
 
-	ventiladorPin.off()
+    ventiladorPin.off()
+    
+    placaPeltierPin1.off()
 
-	placaPeltierPin1.off()
+    placaPeltierPin2.off()
 
-	placaPeltierPin2.off()
+    bombaPin1.off()
 
-	bombaPin1.off()
+    bombaPin2.off()
 
-	bombaPin2.off()
-
-	changeColor(0, 0, 0)
+    changeColor(0, 0, 0)
