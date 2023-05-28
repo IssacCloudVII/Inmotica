@@ -14,6 +14,7 @@ import numpy
 
 IPSERVER  = "192.168.1.16"
 PORTSERVER = 8000
+process = None
 
 def create_client(IP, port):
     # create socket object
@@ -31,21 +32,40 @@ def create_client(IP, port):
         messagebox.showerror("Error", "No se pudo establecer la conexión con el servidor.")
 
 def startUploadthread():
+    global process
     # Logic to upload the code
     print("Uploading code...")
     upload_command = "ampy --port COM4 run auxiliar.py"
-    result = subprocess.run(upload_command, shell=True)
+    process = subprocess.Popen(upload_command, shell=True)
 
 def uploadAndConnect():
     upload_thread = threading.Thread(target = startUploadthread)
     upload_thread.start()
     print("Esperando")
     time.sleep(10)
-    print("Conectado")
-    create_client(IPSERVER, PORTSERVER)
+    #print("Conectado")
+    #global socketClient
+    #create_client(IPSERVER, PORTSERVER)
+
+def obtain_temperature(socket):
+    print("Obtiendo temperaturas del servidor: ")
+    try:
+        # unpack the temperature data using struct
+        temperature_string = socket.recv(1024).decode()
+        temperatures = [float(temp) for temp in temperature_string.split(",")]
+        # print the temperatures
+        global sensor_temperatures
+        sensor_temperatures = temperatures
+
+    except KeyboardInterrupt:
+        # close the connection and exit the program when Ctrl+C is pressed
+        socket.close()
+        print("\nProgram terminated by user.")
 
 def stop_execution():
     # Logic to stop the execution
+    global process
+    process.terminate()
     print("Execution stopped.")
 
 def update_code(checkboxes):
@@ -190,7 +210,9 @@ def emergencyStop(checkboxes):
         check.set(0)
     update_code(checkboxes)
 
-def show_temperature(temperatures):
+def show_temperature():
+
+    temperatures = obtain_temperature(client_socket)
 
     # Delete any existing temperature bar in the canvas
     canvas.delete("all")
@@ -224,6 +246,7 @@ def show_temperature(temperatures):
     
     average = sum(temperatures) / len(temperatures)
     average_text.config(text=f"Temperatura Promedio: {average:.2f} °C")
+    root.after(500, show_temperature)
 
 textSensores = ["Sensor 1", "Sensor 2","Sensor 3", "Sensor 4", "Sensor 5", "Sensor 6", "Sensor 7", "Sensor 8"]
 colors = ["blue", "orange", "red"]
@@ -289,8 +312,6 @@ status_text.place(x = 50, y = 50)
 
 client_socket = None
 connected = False
-
-show_temperature(numpy.random.random(8) * 10 + 20)
 
 # Start the main event loop
 root.mainloop()

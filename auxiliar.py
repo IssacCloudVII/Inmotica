@@ -4,11 +4,6 @@ import socket
 import random
 import time
 
-def changeColor(red, green, blue):
-    red_pwm.duty(red)
-    green_pwm.duty(green)
-    blue_pwm.duty(blue)
-
 def generateTemperature():
     minTemp = 20
     maxTemp = 40
@@ -53,6 +48,13 @@ conn, addr = s.accept()
 print("Connected by", addr)
 time.sleep(3)
 
+while True:
+    temperatures = generateTemperature()
+    print("Enviando")
+    temperature_string = ",".join(str(temp) for temp in temperatures)
+    conn.sendall(temperature_string.encode())
+    time.sleep(1)
+
 # Pines de termopar
 termoparActive = Pin(18, Pin.OUT)
 bombaPin1 = Pin(15, Pin.OUT)  # Bomba caliente
@@ -67,11 +69,6 @@ flamePin = ADC(Pin(12))  # Pin ADC para detecci�n de llama
 smokeLED = Pin(21, Pin.OUT)  # LED de detecci�n de humo
 smokePin = ADC(Pin(13))  # Pin ADC para detecci�n de humo
 
-# Pines para el LED RGB
-red_pin = Pin(1, Pin.OUT)
-green_pin = Pin(22, Pin.OUT)
-blue_pin = Pin(23, Pin.OUT)
-
 # Pines de termopar
 termopar_pins = [
     ADC(Pin(14)),  # Serpentin frio
@@ -85,10 +82,6 @@ termopar_pins = [
 # Sensor DHT11
 sensor = dht.DHT11(Pin(19))
 
-# set up PWM objects for each pin
-red_pwm = PWM(red_pin, freq=1000)
-green_pwm = PWM(green_pin, freq=1000)
-blue_pwm = PWM(blue_pin, freq=1000)
 
 # set initial RGB values
 red_value = 0
@@ -111,7 +104,6 @@ blanco = True
 apagado = False
 
 while True:
-    termoparActive.on()
     temperatures = read_temperature(termopar_pins)
     temperatureAverage = sum(temperatures) / len(temperatures)
 
@@ -119,6 +111,7 @@ while True:
     conn.sendall(temperature_string.encode())
 
     continue
+    termoparActive.on()
 
     # read the analog voltage from the ADC pin
     flameVoltage = flamePin.read() / 1023 * 2.727
